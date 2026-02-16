@@ -118,6 +118,7 @@ class Component(ABC):
     def __init__(self, loc: str = None):
         self.loc = self.__class__.__name__ if loc is None else loc
         self.args = {}
+        self.arg_schema = None #Optional schema for validating component arguments before _setup()
         self.P = None
     
     def load_component(self, loc: str, args: Optional[Dict[str, Any]] = None, setup: bool = True):
@@ -128,8 +129,55 @@ class Component(ABC):
     def check_args(self, args: dict) -> bool:
         """Check whether provided args contain all required keys."""
         return all(arg in args for arg in self.args)
+    
+    def _validate_args(self, args: Dict[str, Any]) -> None:
+        """
+        Centralized argument validation hook.
+
+        Runs before _setup() to ensure component arguments
+        meet expected types and basic constraints.
+        """
+        if self.arg_schema is None:
+            return  # Backward compatibility
+
+        for key, rule in self.arg_schema.items():
+            # Required check
+            if rule.get("required", True) and key not in args:
+                raise ValueError(f"Missing required argument: '{key}'")
+
+            if key not in args:
+                continue
+            value = args[key]
+
+        # Type check
+        expected_type = rule.get("type")
+        if expected_type and not isinstance(value, expected_type):
+            raise TypeError(
+                f"Argument '{key}' must be of type {expected_type.__name__}"
+            )
+
+        # Numeric constraints
+        if isinstance(value, (int, float)):
+            if "min" in rule and value < rule["min"]:
+                raise ValueError(f"Argument '{key}' must be >= {rule['min']}")
+            if "max" in rule and value > rule["max"]:
+                raise ValueError(f"Argument '{key}' must be <= {rule['max']}")
+
+        # Length constraints
+        if hasattr(value, "__len__"):
+            if "min_length" in rule and len(value) < rule["min_length"]:
+                raise ValueError(
+                    f"Argument '{key}' length must be >= {rule['min_length']}"
+                )
+            if "max_length" in rule and len(value) > rule["max_length"]:
+                raise ValueError(
+                    f"Argument '{key}' length must be <= {rule['max_length']}"
+                )
+
+
 
     def setup(self, args: Dict[str, Any]) -> Optional[Any]:
+        self._validate_args(args)  #golabal validation hook
         """
             Set up the component with provided arguments.
 
