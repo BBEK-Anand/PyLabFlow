@@ -1,53 +1,105 @@
 Quick Start
 ===========
 
-1. **Create a Python environment**
+This page walks you through a minimal, reliable setup for PyLabFlow.
+
+Prerequisites
+-------------
+
+- Python 3.9+
+- ``pip`` (or ``conda``)
+- A local folder for your project and custom components
+
+1. Create an isolated Python environment
+---------------------------------------
 
    .. code-block:: bash
 
-      conda create -n plf_env
+      conda create -n plf_env python=3.10
       conda activate plf_env
 
-2. **Install required packages**
+   You can also use ``venv``:
+
+   .. code-block:: bash
+
+      python -m venv .venv
+      .venv\Scripts\activate
+
+2. Install PyLabFlow
+--------------------
 
    .. code-block:: bash
 
       pip install PyLabFlow jupyter
 
-3. **Download the example project**
+   For development from source:
 
-   To download the `Basic` folder from GitHub:
+   .. code-block:: bash
 
-   1. Go to the website:
+      git clone https://github.com/ExperQuick/PyLabFlow.git
+      cd PyLabFlow
+      pip install -e .
 
-   .. code-block:: text
+3. Verify installation
+----------------------
 
-      https://download-directory.github.io/
+   .. code-block:: bash
 
-   2. Paste the GitHub folder URL:
+      python -c "import plf; print('PyLabFlow import OK')"
 
-   .. code-block:: text
+4. Create your first lab project
+--------------------------------
 
-      https://github.com/ExperQuick/PLF_DL_SetUps/tree/main/Basic
+   .. code-block:: python
 
-   3. Download the folder and extract it to a location of your choice on your device.
+      from plf.lab import create_project, lab_setup
 
-4. **Launch Jupyter Notebook**
+      settings = {
+          "project_name": "my_first_lab",
+          "project_dir": "./projects",
+          "component_dir": "./components"
+      }
+
+      settings_path = create_project(settings)
+      lab_setup(settings_path)
+
+   This creates your project folder, initializes tracking databases, and
+   registers your component directory for the current session.
+
+5. (Optional) Launch Jupyter
+----------------------------
 
    .. code-block:: bash
 
       jupyter notebook
 
-5. **Open the project in your browser**
+6. Use the official example setup
+---------------------------------
 
-   Navigate to the folder where you extracted the downloaded project.
+   If you prefer a ready-made example, download the ``Basic`` setup:
 
-6. **Follow the instructions sequentially**
+   1. Open:
 
-   Execute the files in order:
+   .. code-block:: text
+
+      https://download-directory.github.io/
+
+   2. Paste:
+
+   .. code-block:: text
+
+      https://github.com/ExperQuick/PLF_DL_SetUps/tree/main/Basic
+
+   3. Extract the downloaded folder.
+   4. Run files in this order:
 
    - `setup.py`
    - `experiment.ipynb`
    - `Monitor.ipynb`
 
-   Follow the steps in the README and respective `.ipynb` files inside the folder for smooth setup, experiments, and monitoring.
+Next steps
+----------
+
+- Continue with :doc:`workflow` to build and run pipelines.
+- See :doc:`experiment_management` to query, filter, archive, and transfer experiments.
+- Follow :doc:`reproducibility` for repeatable experiment practices.
