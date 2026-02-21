@@ -1,12 +1,13 @@
-User's workflow doing experiments
----------------------------------
+Workflow Guide
+==============
 
-Before you start designing workflows and pipelines, you need a **project environment**, often called a “lab.” The lab organizes all your experiments, components, and logs in a reproducible way.
+Before building workflows and pipelines, create (or load) a lab environment.
+The lab stores settings, logs, and pipeline records in a consistent structure.
 
-Creating a Project
-~~~~~~~~~~~~~~~~~~
+Create a New Lab
+----------------
 
-You can create a project using the `create_project` function:
+Use ``create_project`` when starting a new project:
 
 .. code-block:: python
 
@@ -20,46 +21,95 @@ You can create a project using the `create_project` function:
 
     settings_path = create_project(settings)
 
-**What `create_project` does:**
+This initializes project metadata and tracking databases, including:
 
-1. **Directory Setup:**  
-   Creates the main project directory and subdirectories for components, data, logs, workflows, and pipelines.
+- ``logs.db`` for session tracking
+- ``ppls.db`` for active pipelines
+- ``Archived/ppls.db`` for archived pipelines
 
-2. **Settings Management:**  
-   Generates a JSON file storing all paths and configuration parameters, which ensures reproducibility.
+Load an Existing Lab
+--------------------
 
-3. **Database Initialization:**  
-   Sets up the following databases under the project’s data directory:
-   
-   - `logs.db`: Tracks execution logs.
-   - `ppls.db`: Tracks pipelines, their status, and dependencies.
-   - `Archived/ppls.db`: Stores completed or archived pipelines.
-
-4. **Shared Data Setup:**  
-   Registers paths and project metadata globally so all parts of the framework can access them consistently.
-
-**Result:** You now have a fully prepared workspace where you can safely develop, run, and track experiments.
-
-Accessing an Existing Project
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-If a project already exists, you can **load it** using `lab_setup`:
+Use ``lab_setup`` to continue work in an existing project:
 
 .. code-block:: python
 
     from plf.lab import lab_setup
     lab_setup(settings_path)
 
-**What `lab_setup` does:**
+This loads project settings, registers component paths, and creates a log entry
+for the current session.
 
-- Loads the project settings JSON file.
-- Sets up shared data so that all utilities, components, and workflows can access project paths.
-- Registers the component directories so you can import and use them dynamically.
-- Creates a new **log entry** in `logs.db` to track that this project was accessed.
+Workflow Example 1: Single Pipeline Run
+---------------------------------------
 
-**Why this matters:**
+This example shows a standard run sequence: define config, create pipeline,
+prepare resources, then execute.
 
-- Every session of your lab is tracked.
-- Components and workflows can safely access the correct directories.
-- Your experiment history is auditable and reproducible.
+.. code-block:: python
+
+   from plf.experiment import PipeLine
+
+   pipeline_config = {
+      "workflow": {
+         "loc": "my_workflows.TrainWorkflow",
+         "args": {}
+      },
+      "args": {
+         "loader": {
+            "loc": "my_components.DataLoader",
+            "args": {"path": "./data/train.csv"}
+         },
+         "trainer": {
+            "loc": "my_components.Trainer",
+            "args": {"epochs": 20, "lr": 1e-3}
+         }
+      }
+   }
+
+   P = PipeLine()
+   P.new(pplid="baseline_v1", args=pipeline_config)
+   P.prepare()
+   P.run()
+
+Workflow Example 2: Parameter Variations
+----------------------------------------
+
+Use one workflow template with different arguments to create comparable runs.
+
+.. code-block:: python
+
+   from plf.experiment import PipeLine
+
+   lrs = [1e-2, 1e-3, 1e-4]
+   for lr in lrs:
+      pplid = f"lr_{lr}"
+      cfg = {
+         "workflow": {"loc": "my_workflows.TrainWorkflow", "args": {}},
+         "args": {
+            "loader": {
+               "loc": "my_components.DataLoader",
+               "args": {"path": "./data/train.csv"}
+            },
+            "trainer": {
+               "loc": "my_components.Trainer",
+               "args": {"epochs": 20, "lr": lr}
+            }
+         }
+      }
+
+      pipeline = PipeLine()
+      pipeline.new(pplid=pplid, args=cfg)
+      pipeline.prepare()
+      pipeline.run()
+
+Recommended Run Order
+---------------------
+
+1. Create or load lab (``create_project`` / ``lab_setup``)
+2. Define workflow + component configuration
+3. Create pipeline (``PipeLine().new(...)``)
+4. Prepare runtime resources (``prepare``)
+5. Execute (``run``)
+6. Review status and metadata (see :doc:`experiment_management`)
 
