@@ -27,6 +27,7 @@ allowingyou to experiment anywhere, anytime, without internet dependency.
 __all__ = [
     "context",
     "experiment",
+    "metrics",
     "utils",
     "lab",
     "danger"

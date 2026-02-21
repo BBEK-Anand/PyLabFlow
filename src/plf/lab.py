@@ -90,6 +90,7 @@ def setup_databases(settings: dict):
     Sets up the required databases for the lab project, including:
     - logs.db (with logs table)
     - ppls.db (with ppls, edges, runnings tables)
+    - metrics.db (with metric_runs, metrics tables)
     - Archived/ppls.db (with ppls table)
     """
     # ---- logs.db ----
@@ -139,6 +140,48 @@ def setup_databases(settings: dict):
         """
     ]
     create_and_init_db(ppls_db_path, ppls_tables)
+
+    # ---- metrics.db ----
+    metrics_db_path = os.path.join(settings["data_path"], "metrics.db")
+    metrics_tables = [
+        """
+        CREATE TABLE IF NOT EXISTS metric_runs (
+            runid TEXT PRIMARY KEY,
+            pplid TEXT NOT NULL,
+            logid TEXT,
+            args_hash TEXT,
+            config_hash TEXT,
+            config_path TEXT,
+            run_name TEXT,
+            status TEXT NOT NULL DEFAULT 'running'
+                CHECK(status IN ('running', 'completed', 'failed', 'stopped')),
+            created_at TEXT NOT NULL,
+            ended_at TEXT,
+            caller TEXT,
+            plf_version TEXT,
+            metadata_json TEXT
+        );
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS metrics (
+            recid INTEGER PRIMARY KEY AUTOINCREMENT,
+            runid TEXT NOT NULL,
+            pplid TEXT NOT NULL,
+            step INTEGER NOT NULL,
+            split TEXT NOT NULL DEFAULT 'train',
+            name TEXT NOT NULL,
+            value REAL NOT NULL,
+            created_at TEXT NOT NULL,
+            extra_json TEXT,
+            FOREIGN KEY(runid) REFERENCES metric_runs(runid),
+            UNIQUE(runid, step, split, name)
+        );
+        """,
+        "CREATE INDEX IF NOT EXISTS idx_metrics_pplid_step ON metrics(pplid, step);",
+        "CREATE INDEX IF NOT EXISTS idx_metrics_runid ON metrics(runid);",
+    ]
+    create_and_init_db(metrics_db_path, metrics_tables)
+    os.makedirs(os.path.join(settings["data_path"], "Metrics"), exist_ok=True)
 
     os.makedirs(os.path.join(settings["data_path"], "Archived"), exist_ok=True)
     # ---- Archived/ppls.db ----

@@ -9,4 +9,5 @@
    lab
    utils
    experiment
+   metrics
 

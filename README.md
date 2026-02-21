@@ -204,6 +204,33 @@ The `plf.experiment` module provides powerful tools for managing your PPL databa
 
 ---
 
+## 📈 Structured Metric Logging
+
+PyLabFlow now supports step-wise metric tracking with dual local persistence:
+- SQLite (`metrics.db`) for queryable analytics
+- JSONL files (`Metrics/<pplid>/<runid>/metrics.jsonl`) for portable logs
+
+```python
+from plf.metrics import start_run, get_metrics, end_run
+
+logger = start_run(pplid="ppl_data_run_001", run_name="baseline")
+
+for step in range(5):
+  logger.log_metrics(
+    step=step,
+    metrics={"loss": 1.0 / (step + 1), "acc": step / 5},
+    split="train"
+  )
+
+end_run(logger)
+df = get_metrics(pplid="ppl_data_run_001")
+print(df.head())
+```
+
+Each run stores reproducibility metadata (e.g., config hash, args hash, caller, run timestamps) in both SQLite and run-level metadata files.
+
+---
+
 ## 📜 License
 
 This project is licensed under the **Apache License 2.0**.  © 2025 BBEK Anand
