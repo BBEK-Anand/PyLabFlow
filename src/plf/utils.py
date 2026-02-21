@@ -10,7 +10,6 @@ import hashlib
 import warnings
 import importlib
 import sqlite3
-import traceback
 from abc import ABC, abstractmethod
 
 from .context import get_shared_data
@@ -125,9 +124,109 @@ class Component(ABC):
         comp.P = self.P
         return comp
 
+    def _required_args(self) -> List[str]:
+        """
+        Return required argument names inferred from ``self.args``.
+
+        Supported formats:
+        - dict: keys are treated as required argument names
+        - list/tuple/set: items are treated as required argument names
+        - None: no required arguments
+        """
+        if self.args is None:
+            return []
+        if isinstance(self.args, dict):
+            return list(self.args.keys())
+        if isinstance(self.args, (list, tuple, set)):
+            invalid = [k for k in self.args if not isinstance(k, str)]
+            if invalid:
+                raise TypeError(
+                    f"Component '{self.loc}' has non-string argument keys in 'self.args': {invalid}"
+                )
+            return list(self.args)
+        raise TypeError(
+            f"Component '{self.loc}' defines unsupported args schema type "
+            f"'{type(self.args).__name__}'. Use dict, list, tuple, set, or None."
+        )
+
+    def _validate_typed_args(self, args: Dict[str, Any]) -> None:
+        """
+        Optionally validate argument value types for dict-based schemas.
+
+        Backward-compatible rules:
+        - if ``self.args`` is not a dict, skip typed checks
+        - for each key in dict schema:
+          * ``type`` or tuple of ``type`` -> ``isinstance`` validation
+          * callable -> called as validator(value), must return truthy
+          * any other value -> ignored (legacy behavior)
+        """
+        if not isinstance(self.args, dict):
+            return
+
+        for key, validator in self.args.items():
+            if key not in args:
+                continue
+
+            value = args[key]
+
+            if isinstance(validator, type):
+                if not isinstance(value, validator):
+                    raise TypeError(
+                        f"Invalid type for '{key}' in component '{self.loc}': "
+                        f"expected {validator.__name__}, got {type(value).__name__}"
+                    )
+            elif isinstance(validator, tuple) and validator and all(
+                isinstance(item, type) for item in validator
+            ):
+                if not isinstance(value, validator):
+                    expected = ", ".join(v.__name__ for v in validator)
+                    raise TypeError(
+                        f"Invalid type for '{key}' in component '{self.loc}': "
+                        f"expected one of ({expected}), got {type(value).__name__}"
+                    )
+            elif callable(validator):
+                try:
+                    valid = validator(value)
+                except Exception as exc:
+                    raise ValueError(
+                        f"Validation callable failed for '{key}' in component '{self.loc}': {exc}"
+                    ) from exc
+                if not valid:
+                    raise ValueError(
+                        f"Validation failed for '{key}' in component '{self.loc}'"
+                    )
+
+    def validate_args(self, args: Dict[str, Any]) -> None:
+        """
+        Centralized argument validation for all components.
+
+        Ensures args is a dictionary, verifies required keys declared in
+        ``self.args``, and applies optional type/callable validators.
+        """
+        if args is None:
+            args = {}
+        if not isinstance(args, dict):
+            raise TypeError(
+                f"Arguments for component '{self.loc}' must be a dict, "
+                f"got {type(args).__name__}"
+            )
+
+        required = self._required_args()
+        missing = [arg for arg in required if arg not in args]
+        if missing:
+            raise ValueError(
+                f"Missing required argument(s) for component '{self.loc}': {', '.join(missing)}"
+            )
+
+        self._validate_typed_args(args)
+
     def check_args(self, args: dict) -> bool:
-        """Check whether provided args contain all required keys."""
-        return all(arg in args for arg in self.args)
+        """Check whether provided args satisfy the configured validation rules."""
+        try:
+            self.validate_args(args)
+            return True
+        except (TypeError, ValueError):
+            return False
 
     def setup(self, args: Dict[str, Any]) -> Optional[Any]:
         """
@@ -139,18 +238,20 @@ class Component(ABC):
             Returns:
                 Optional[Any]: Initialized component or setup result.
         """
-        if self.check_args(args):
-            # print(154,args)
-            try:
-                self._setup(args)
-                return self
-            except AttributeError as exc:
-                raise AttributeError(
-                    f"Component '{self.loc}' does not implement '_setup'"
-                ) from exc
-        
-        traceback.print_exc()
-        raise ValueError(f"Arguments {args} are incompatible with '{self.loc}'")
+        self.validate_args(args)
+
+        if not self.check_args(args):
+            raise ValueError(
+                f"Arguments {args} are incompatible with '{self.loc}'"
+            )
+
+        try:
+            self._setup(args)
+            return self
+        except AttributeError as exc:
+            raise AttributeError(
+                f"Component '{self.loc}' does not implement '_setup'"
+            ) from exc
         
     
     @abstractmethod
